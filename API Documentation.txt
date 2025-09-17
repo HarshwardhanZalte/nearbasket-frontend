@@ -747,31 +747,3 @@ Error Responses
 
 403 - Only shop owner can update order status
 400 - Cannot modify delivered/rejected orders or insufficient stock
-
-
-🔄 Business Rules & Constraints
-Key Business Rules
-One Shop Per Shopkeeper
-
-Each shopkeeper can have exactly one shop
-Shop information must be provided during shopkeeper registration
-Shop is created automatically during shopkeeper registration
-
-Customer-Shop Relationships
-
-Customers can join multiple shops
-Customers can only order from shops they've joined
-Shopkeepers can add customers to their shop by mobile number
-
-Order Processing
-
-Orders start with PENDING status
-Stock is reduced when order status changes to ACCEPTED
-Orders cannot be modified once DELIVERED or REJECTED
-If status changes from ACCEPTED to REJECTED, stock is restored
-
-Role-Based Access Control
-
-Customers can: join shops, view products, place orders, track orders
-Shopkeepers can: manage their shop, add products, manage customers, process orders
-Users cannot change their role after registration 
