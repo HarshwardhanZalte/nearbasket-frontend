@@ -14,123 +14,11 @@ import {
 } from 'lucide-react';
 import { Order } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { orderService } from '@/services/order';
+import { useAuth } from '@/contexts/AuthContext';
+import { ApiError } from '@/services/api';
 
-const mockOrders: Order[] = [
-  {
-    id: 'ord1',
-    customerId: 'cust1',
-    shopId: '1',
-    items: [
-      {
-        product: {
-          id: 'p1',
-          name: 'Fresh Organic Apples',
-          description: 'Premium quality organic apples',
-          price: 3.99,
-          category: 'Fruits',
-          image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300',
-          shopId: '1',
-          inStock: true,
-          quantity: 50,
-        },
-        quantity: 2,
-      },
-      {
-        product: {
-          id: 'p2',
-          name: 'Whole Wheat Bread',
-          description: 'Freshly baked whole wheat bread',
-          price: 2.49,
-          category: 'Bakery',
-          image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=300',
-          shopId: '1',
-          inStock: true,
-          quantity: 20,
-        },
-        quantity: 1,
-      },
-    ],
-    total: 10.47,
-    status: 'pending',
-    createdAt: '2024-01-15T10:30:00Z',
-    deliveryAddress: '123 Main St, Downtown',
-  },
-  {
-    id: 'ord2',
-    customerId: 'cust2',
-    shopId: '1',
-    items: [
-      {
-        product: {
-          id: 'p3',
-          name: 'Farm Fresh Milk',
-          description: 'Pure milk from local farms',
-          price: 1.99,
-          category: 'Dairy',
-          image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300',
-          shopId: '1',
-          inStock: true,
-          quantity: 30,
-        },
-        quantity: 2,
-      },
-    ],
-    total: 6.97,
-    status: 'accepted',
-    createdAt: '2024-01-14T15:45:00Z',
-    deliveryAddress: '456 Oak Ave, Uptown',
-  },
-  {
-    id: 'ord3',
-    customerId: 'cust3',
-    shopId: '1',
-    items: [
-      {
-        product: {
-          id: 'p1',
-          name: 'Fresh Organic Apples',
-          description: 'Premium quality organic apples',
-          price: 3.99,
-          category: 'Fruits',
-          image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300',
-          shopId: '1',
-          inStock: true,
-          quantity: 50,
-        },
-        quantity: 5,
-      },
-    ],
-    total: 22.94,
-    status: 'delivered',
-    createdAt: '2024-01-12T09:15:00Z',
-    deliveryAddress: '789 Pine St, Midtown',
-  },
-  {
-    id: 'ord4',
-    customerId: 'cust4',
-    shopId: '1',
-    items: [
-      {
-        product: {
-          id: 'p2',
-          name: 'Whole Wheat Bread',
-          description: 'Freshly baked whole wheat bread',
-          price: 2.49,
-          category: 'Bakery',
-          image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=300',
-          shopId: '1',
-          inStock: true,
-          quantity: 20,
-        },
-        quantity: 3,
-      },
-    ],
-    total: 10.46,
-    status: 'rejected',
-    createdAt: '2024-01-13T14:20:00Z',
-    deliveryAddress: '321 Elm St, Southside',
-  },
-];
+// Using backend orders
 
 const customerNames = {
   'cust1': 'John Doe',
@@ -143,36 +31,53 @@ export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setOrders(mockOrders);
+    if (user?.shop) {
+      loadOrders();
+    }
+  }, [user]);
+
+  const loadOrders = async () => {
+    if (!user?.shop) return;
+    try {
+      setLoading(true);
+      const response = await orderService.getShopOrders(user.shop.id);
+      setOrders(response);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: 'Error Loading Orders',
+        description: apiError.message || 'Failed to load orders',
+        variant: 'destructive',
+      });
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
 
   const getStatusConfig = (status: Order['status']) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return {
           icon: Clock,
           color: 'bg-warning text-warning-foreground',
           label: 'Pending',
         };
-      case 'accepted':
+      case 'ACCEPTED':
         return {
           icon: CheckCircle,
           color: 'bg-success text-success-foreground',
           label: 'Accepted',
         };
-      case 'delivered':
+      case 'DELIVERED':
         return {
           icon: Truck,
           color: 'bg-primary text-primary-foreground',
           label: 'Delivered',
         };
-      case 'rejected':
+      case 'REJECTED':
         return {
           icon: XCircle,
           color: 'bg-destructive text-destructive-foreground',
@@ -197,55 +102,43 @@ export default function Orders() {
     });
   };
 
-  const handleAcceptOrder = (orderId: string) => {
-    setOrders(prev =>
-      prev.map(order =>
-        order.id === orderId
-          ? { ...order, status: 'accepted' as const }
-          : order
-      )
-    );
-    toast({
-      title: "Order Accepted",
-      description: "The order has been accepted and customer will be notified",
-    });
-  };
-
-  const handleRejectOrder = (orderId: string) => {
-    if (window.confirm('Are you sure you want to reject this order?')) {
-      setOrders(prev =>
-        prev.map(order =>
-          order.id === orderId
-            ? { ...order, status: 'rejected' as const }
-            : order
-        )
-      );
-      toast({
-        title: "Order Rejected",
-        description: "The order has been rejected and customer will be notified",
-        variant: "destructive",
-      });
+  const handleAcceptOrder = async (orderId: number) => {
+    try {
+      const updated = await orderService.updateOrderStatus(orderId, { status: 'ACCEPTED' });
+      setOrders(prev => prev.map(o => (o.id === orderId ? updated : o)));
+      toast({ title: 'Order Accepted', description: 'Customer will be notified' });
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({ title: 'Update Failed', description: apiError.message || 'Could not accept order', variant: 'destructive' });
     }
   };
 
-  const handleMarkDelivered = (orderId: string) => {
-    setOrders(prev =>
-      prev.map(order =>
-        order.id === orderId
-          ? { ...order, status: 'delivered' as const }
-          : order
-      )
-    );
-    toast({
-      title: "Order Delivered",
-      description: "The order has been marked as delivered",
-    });
+  const handleRejectOrder = async (orderId: number) => {
+    if (!window.confirm('Are you sure you want to reject this order?')) return;
+    try {
+      const updated = await orderService.updateOrderStatus(orderId, { status: 'REJECTED' });
+      setOrders(prev => prev.map(o => (o.id === orderId ? updated : o)));
+      toast({ title: 'Order Rejected', variant: 'destructive' });
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({ title: 'Update Failed', description: apiError.message || 'Could not reject order', variant: 'destructive' });
+    }
+  };
+
+  const handleMarkDelivered = async (orderId: number) => {
+    try {
+      const updated = await orderService.updateOrderStatus(orderId, { status: 'DELIVERED' });
+      setOrders(prev => prev.map(o => (o.id === orderId ? updated : o)));
+      toast({ title: 'Order Delivered' });
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({ title: 'Update Failed', description: apiError.message || 'Could not mark delivered', variant: 'destructive' });
+    }
   };
 
   const OrderCard = ({ order }: { order: Order }) => {
     const statusConfig = getStatusConfig(order.status);
     const StatusIcon = statusConfig.icon;
-    const customerName = customerNames[order.customerId as keyof typeof customerNames] || 'Unknown Customer';
 
     return (
       <Card className="mb-4 hover:shadow-md transition-shadow">
@@ -253,13 +146,13 @@ export default function Orders() {
           <div className="flex items-start justify-between mb-3">
             <div>
               <h3 className="font-semibold text-foreground text-lg mb-1">
-                Order #{order.id.slice(-6).toUpperCase()}
+                Order #{order.id.toString().slice(-6).toUpperCase()}
               </h3>
               <p className="text-sm text-muted-foreground mb-1">
-                Customer: {customerName}
+                Customer: {order.customer.name}
               </p>
               <p className="text-sm text-muted-foreground">
-                {formatDate(order.createdAt)}
+                {formatDate(order.created_at)}
               </p>
             </div>
             <Badge className={statusConfig.color}>
@@ -269,23 +162,19 @@ export default function Orders() {
           </div>
 
           <div className="space-y-2 mb-4">
-            {order.items.map((item, index) => (
+            {order.order_items.map((item, index) => (
               <div key={index} className="flex items-center gap-3 p-2 bg-muted/30 rounded-lg">
                 <div className="w-12 h-12 bg-gradient-secondary rounded-lg overflow-hidden">
-                  <img 
-                    src={item.product.image} 
-                    alt={item.product.name}
-                    className="w-full h-full object-cover"
-                  />
+                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">📦</div>
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-sm">{item.product.name}</p>
+                  <p className="font-medium text-sm">{item.product_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    Qty: {item.quantity} × ${item.product.price}
+                    Qty: {item.quantity} × ₹{item.price}
                   </p>
                 </div>
                 <span className="text-sm font-medium">
-                  ${(item.quantity * item.product.price).toFixed(2)}
+                  ₹{(item.quantity * parseFloat(item.price)).toFixed(2)}
                 </span>
               </div>
             ))}
@@ -293,16 +182,13 @@ export default function Orders() {
 
           <div className="border-t border-border pt-3 mb-4">
             <div className="flex items-center justify-between text-sm mb-2">
-              <span>Items ({order.items.length})</span>
-              <span>${order.total.toFixed(2)}</span>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              <strong>Delivery Address:</strong> {order.deliveryAddress}
+              <span>Items ({order.order_items.length})</span>
+              <span>₹{order.total_amount}</span>
             </div>
           </div>
 
           {/* Order Actions */}
-          {order.status === 'pending' && (
+          {order.status === 'PENDING' && (
             <div className="flex gap-2">
               <Button
                 onClick={() => handleAcceptOrder(order.id)}
@@ -324,7 +210,7 @@ export default function Orders() {
             </div>
           )}
 
-          {order.status === 'accepted' && (
+          {order.status === 'ACCEPTED' && (
             <Button
               onClick={() => handleMarkDelivered(order.id)}
               className="w-full"
@@ -377,7 +263,13 @@ export default function Orders() {
 
   const filterOrders = (status: string) => {
     if (status === 'all') return orders;
-    return orders.filter(order => order.status === status);
+    const statusMap: Record<string, Order['status']> = {
+      pending: 'PENDING',
+      accepted: 'ACCEPTED',
+      delivered: 'DELIVERED',
+      rejected: 'REJECTED',
+    };
+    return orders.filter(order => order.status === statusMap[status]);
   };
 
   const getOrderCounts = () => {

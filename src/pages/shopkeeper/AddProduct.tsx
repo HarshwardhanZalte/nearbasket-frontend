@@ -9,6 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { ArrowLeft, Save, Upload } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+import { productService } from '@/services/product';
+import { ApiError } from '@/services/api';
 
 const categories = [
   'Fruits',
@@ -37,6 +40,7 @@ export default function AddProduct() {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const { user } = useAuth();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -50,17 +54,39 @@ export default function AddProduct() {
       return;
     }
 
-    setIsSubmitting(true);
+    if (!user?.shop) {
+      toast({
+        title: "No Shop Found",
+        description: "Only shopkeepers with a shop can add products",
+        variant: "destructive",
+      });
+      return;
+    }
 
-    // Simulate API call
-    setTimeout(() => {
-      setIsSubmitting(false);
+    setIsSubmitting(true);
+    try {
+      await productService.createProduct(user.shop.id, {
+        name: formData.name,
+        price: parseFloat(formData.price),
+        stock: formData.quantity ? parseInt(formData.quantity as string, 10) : 0,
+        product_image_url: formData.image || undefined,
+        description: formData.description,
+      });
       toast({
         title: "Product Added",
         description: "Your product has been added to inventory",
       });
       navigate('/shopkeeper/products');
-    }, 1500);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: "Add Product Failed",
+        description: apiError.message || 'Could not add product',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleInputChange = (field: string, value: string | boolean) => {
@@ -114,7 +140,7 @@ export default function AddProduct() {
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="price">Price ($) *</Label>
+                    <Label htmlFor="price">Price (₹) *</Label>
                     <Input
                       id="price"
                       type="number"
@@ -249,7 +275,7 @@ export default function AddProduct() {
                       {formData.category || 'Category'}
                     </p>
                     <p className="text-lg font-bold text-primary mt-1">
-                      ${formData.price || '0.00'}
+                      ₹{formData.price || '0.00'}
                     </p>
                   </div>
                 </div>

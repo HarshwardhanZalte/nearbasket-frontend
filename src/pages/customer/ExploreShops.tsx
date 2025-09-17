@@ -8,6 +8,7 @@ import { Shop } from '@/types';
 import { shopService } from '@/services/shop';
 import { useToast } from '@/hooks/use-toast';
 import { ApiError } from '@/services/api';
+import { Button } from '@/components/ui/button';
 
 export default function ExploreShops() {
   const [shops, setShops] = useState<Shop[]>([]);
@@ -42,6 +43,17 @@ export default function ExploreShops() {
     shop.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
+  const handleJoinShop = async (shop_id: string) => {
+    try {
+      const res = await shopService.joinShop(shop_id);
+      toast({ title: 'Joined Shop', description: res.message });
+      await loadShops();
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({ title: 'Join Failed', description: apiError.message || 'Could not join shop', variant: 'destructive' });
+    }
+  };
+
   const ShopCard = ({ shop }: { shop: Shop }) => (
     <Card 
       className="cursor-pointer hover:shadow-md transition-all duration-200 hover:-translate-y-1"
@@ -62,10 +74,22 @@ export default function ExploreShops() {
               <p className="text-sm text-muted-foreground">Owner: {shop.owner_name}</p>
             )}
           </div>
-          <Badge variant="default" className="ml-2">
-            <Clock className="w-3 h-3 mr-1" />
-            Open
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Badge variant="default" className="ml-2">
+              <Clock className="w-3 h-3 mr-1" />
+              Open
+            </Badge>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={(e) => {
+                e.stopPropagation();
+                handleJoinShop(shop.shop_id);
+              }}
+            >
+              Join
+            </Button>
+          </div>
         </div>
         
         <p className="text-sm text-muted-foreground mb-3 line-clamp-2">

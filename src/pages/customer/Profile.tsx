@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { Separator } from '@/components/ui/separator';
 import { User, Phone, Mail, MapPin, Edit3, Save, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { authService } from '@/services/auth';
+import { ApiError } from '@/services/api';
 import { useToast } from '@/hooks/use-toast';
 
 export default function Profile() {
@@ -20,6 +22,28 @@ export default function Profile() {
     email: user?.email || '',
     address: user?.address || '',
   });
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      try {
+        const me = await authService.getProfile();
+        setFormData({
+          name: me.name || '',
+          mobile_number: me.mobile_number || '',
+          email: me.email || '',
+          address: me.address || '',
+        });
+      } catch (error) {
+        const apiError = error as ApiError;
+        toast({
+          title: 'Failed to load profile',
+          description: apiError.message || 'Could not fetch profile',
+          variant: 'destructive',
+        });
+      }
+    };
+    fetchProfile();
+  }, []);
 
   const handleSave = async () => {
     const success = await updateUser(formData);
@@ -182,24 +206,7 @@ export default function Profile() {
         </CardContent>
       </Card>
 
-      {/* Account Statistics */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Account Summary</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="text-center p-4 bg-gradient-secondary rounded-lg">
-              <div className="text-2xl font-bold text-primary mb-1">12</div>
-              <div className="text-sm text-muted-foreground">Total Orders</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-secondary rounded-lg">
-              <div className="text-2xl font-bold text-primary mb-1">$156.78</div>
-              <div className="text-sm text-muted-foreground">Total Spent</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Account Statistics removed per requirement */}
 
       <Separator className="my-6" />
 
