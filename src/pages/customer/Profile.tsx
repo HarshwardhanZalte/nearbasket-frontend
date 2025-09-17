@@ -16,24 +16,32 @@ export default function Profile() {
   const [isEditing, setIsEditing] = useState(false);
   const [formData, setFormData] = useState({
     name: user?.name || '',
-    phone: user?.phone || '',
+    mobile_number: user?.mobile_number || '',
     email: user?.email || '',
     address: user?.address || '',
   });
 
-  const handleSave = () => {
-    updateUser(formData);
-    setIsEditing(false);
-    toast({
-      title: "Profile Updated",
-      description: "Your profile information has been saved",
-    });
+  const handleSave = async () => {
+    const success = await updateUser(formData);
+    if (success) {
+      setIsEditing(false);
+      toast({
+        title: "Profile Updated",
+        description: "Your profile information has been saved",
+      });
+    } else {
+      toast({
+        title: "Update Failed",
+        description: "Failed to update profile. Please try again.",
+        variant: "destructive",
+      });
+    }
   };
 
   const handleCancel = () => {
     setFormData({
       name: user?.name || '',
-      phone: user?.phone || '',
+      mobile_number: user?.mobile_number || '',
       email: user?.email || '',
       address: user?.address || '',
     });
@@ -72,7 +80,7 @@ export default function Profile() {
             {user?.name || 'Customer'}
           </h2>
           <p className="text-muted-foreground">
-            {user?.phone}
+            {user?.mobile_number}
           </p>
         </CardContent>
       </Card>
@@ -121,15 +129,15 @@ export default function Profile() {
               {isEditing ? (
                 <Input
                   id="phone"
-                  value={formData.phone}
-                  onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
+                  value={formData.mobile_number}
+                  onChange={(e) => setFormData(prev => ({ ...prev, mobile_number: e.target.value }))}
                   placeholder="Enter your phone number"
                   className="mt-1"
                 />
               ) : (
                 <div className="flex items-center gap-2 mt-2 p-2 bg-muted rounded">
                   <Phone className="w-4 h-4 text-muted-foreground" />
-                  <span>{user?.phone || 'Not provided'}</span>
+                  <span>{user?.mobile_number || 'Not provided'}</span>
                 </div>
               )}
             </div>

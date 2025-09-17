@@ -14,53 +14,11 @@ import {
 } from 'lucide-react';
 import { Product } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { productService } from '@/services/product';
+import { useAuth } from '@/contexts/AuthContext';
+import { ApiError } from '@/services/api';
 
-const mockProducts: Product[] = [
-  {
-    id: 'p1',
-    name: 'Fresh Organic Apples',
-    description: 'Premium quality organic apples, perfect for snacking',
-    price: 3.99,
-    category: 'Fruits',
-    image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300',
-    shopId: '1',
-    inStock: true,
-    quantity: 50,
-  },
-  {
-    id: 'p2',
-    name: 'Whole Wheat Bread',
-    description: 'Freshly baked whole wheat bread, soft and nutritious',
-    price: 2.49,
-    category: 'Bakery',
-    image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=300',
-    shopId: '1',
-    inStock: true,
-    quantity: 20,
-  },
-  {
-    id: 'p3',
-    name: 'Farm Fresh Milk',
-    description: 'Pure and fresh milk from local farms',
-    price: 1.99,
-    category: 'Dairy',
-    image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300',
-    shopId: '1',
-    inStock: true,
-    quantity: 30,
-  },
-  {
-    id: 'p4',
-    name: 'Organic Tomatoes',
-    description: 'Fresh, juicy organic tomatoes',
-    price: 2.99,
-    category: 'Vegetables',
-    image: 'https://images.unsplash.com/photo-1546470427-e4b8b1029d59?w=300',
-    shopId: '1',
-    inStock: false,
-    quantity: 0,
-  },
-];
+// Mock data removed - using real API now
 
 export default function Products() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -68,27 +26,57 @@ export default function Products() {
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuth();
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setProducts(mockProducts);
+    if (user?.shop) {
+      loadProducts();
+    }
+  }, [user]);
+
+  const loadProducts = async () => {
+    if (!user?.shop) return;
+    
+    try {
+      setLoading(true);
+      const response = await productService.getShopProducts(user.shop.id);
+      setProducts(response);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: "Error Loading Products",
+        description: apiError.message || "Failed to load products",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    product.category.toLowerCase().includes(searchQuery.toLowerCase())
+    product.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const handleDeleteProduct = (productId: string) => {
+  const handleDeleteProduct = async (productId: number) => {
+    if (!user?.shop) return;
+    
     if (window.confirm('Are you sure you want to delete this product?')) {
-      setProducts(prev => prev.filter(p => p.id !== productId));
-      toast({
-        title: "Product Deleted",
-        description: "The product has been removed from your inventory",
-      });
+      try {
+        await productService.deleteProduct(user.shop.id, productId);
+        setProducts(prev => prev.filter(p => p.id !== productId));
+        toast({
+          title: "Product Deleted",
+          description: "The product has been removed from your inventory",
+        });
+      } catch (error) {
+        const apiError = error as ApiError;
+        toast({
+          title: "Delete Failed",
+          description: apiError.message || "Failed to delete product",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -96,7 +84,7 @@ export default function Products() {
     <Card className="group hover:shadow-md transition-all duration-200">
       <div className="aspect-square bg-gradient-secondary overflow-hidden">
         <img 
-          src={product.image} 
+          src={product.product_image_url || 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300'} 
           alt={product.name}
           className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
         />
@@ -111,18 +99,18 @@ export default function Products() {
               {product.description}
             </p>
             <Badge variant="outline" className="text-xs mb-2">
-              {product.category}
+              {product.shop_name || 'Product'}
             </Badge>
           </div>
         </div>
         
         <div className="flex items-center justify-between mb-3">
           <span className="text-lg font-bold text-primary">
-            ${product.price}
+            ₹{product.price}
           </span>
           <div className="flex items-center gap-2">
-            <Badge variant={product.inStock ? "default" : "secondary"}>
-              {product.inStock ? `${product.quantity} in stock` : 'Out of stock'}
+            <Badge variant={product.stock > 0 ? "default" : "secondary"}>
+              {product.stock > 0 ? `${product.stock} in stock` : 'Out of stock'}
             </Badge>
           </div>
         </div>
@@ -204,7 +192,7 @@ export default function Products() {
         </Card>
         <Card className="p-4 text-center">
           <div className="text-2xl font-bold text-success">
-            {products.filter(p => p.inStock).length}
+            {products.filter(p => p.stock > 0).length}
           </div>
           <div className="text-sm text-muted-foreground">In Stock</div>
         </Card>

@@ -1,12 +1,15 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User, UserRole } from '@/types';
+import { User, UserRole, SendOtpRequest, VerifyOtpRequest } from '@/types';
+import { authService } from '@/services/auth';
+import { ApiError } from '@/services/api';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
-  login: (phone: string, otp: string, role: UserRole) => Promise<boolean>;
+  sendOtp: (phone: string) => Promise<{ success: boolean; message: string; otp?: string }>;
+  verifyOtp: (phone: string, otp: string) => Promise<{ success: boolean; message: string }>;
   logout: () => void;
-  updateUser: (userData: Partial<User>) => void;
+  updateUser: (userData: Partial<User>) => Promise<boolean>;
   isLoading: boolean;
 }
 
@@ -25,43 +28,79 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check for stored user data
+    // Check for stored user data and token
     const storedUser = localStorage.getItem('nearbasket_user');
-    if (storedUser) {
-      setUser(JSON.parse(storedUser));
+    const token = localStorage.getItem('nearbasket_token');
+    
+    if (storedUser && token) {
+      try {
+        setUser(JSON.parse(storedUser));
+      } catch (error) {
+        console.error('Error parsing stored user:', error);
+        localStorage.removeItem('nearbasket_user');
+        localStorage.removeItem('nearbasket_token');
+      }
     }
     setIsLoading(false);
   }, []);
 
-  const login = async (phone: string, otp: string, role: UserRole): Promise<boolean> => {
-    // Simulate OTP verification
-    if (otp === '1234') {
-      const mockUser: User = {
-        id: `user_${Date.now()}`,
-        name: role === 'customer' ? 'Customer User' : 'Shop Owner',
-        phone,
-        email: `${phone}@example.com`,
-        address: '123 Main St, City',
-        role,
+  const sendOtp = async (phone: string): Promise<{ success: boolean; message: string; otp?: string }> => {
+    try {
+      const response = await authService.sendOtp({ mobile_number: phone });
+      return {
+        success: true,
+        message: response.message,
+        otp: response.otp, // For development - remove in production
       };
-      
-      setUser(mockUser);
-      localStorage.setItem('nearbasket_user', JSON.stringify(mockUser));
-      return true;
+    } catch (error) {
+      const apiError = error as ApiError;
+      return {
+        success: false,
+        message: apiError.message || 'Failed to send OTP',
+      };
     }
-    return false;
+  };
+
+  const verifyOtp = async (phone: string, otp: string): Promise<{ success: boolean; message: string }> => {
+    try {
+      const response = await authService.verifyOtp({
+        mobile_number: phone,
+        otp_code: otp,
+      });
+      
+      setUser(response.user);
+      localStorage.setItem('nearbasket_user', JSON.stringify(response.user));
+      
+      return {
+        success: true,
+        message: response.message,
+      };
+    } catch (error) {
+      const apiError = error as ApiError;
+      return {
+        success: false,
+        message: apiError.message || 'Invalid OTP',
+      };
+    }
   };
 
   const logout = () => {
     setUser(null);
+    authService.logout();
     localStorage.removeItem('nearbasket_user');
   };
 
-  const updateUser = (userData: Partial<User>) => {
-    if (user) {
-      const updatedUser = { ...user, ...userData };
+  const updateUser = async (userData: Partial<User>): Promise<boolean> => {
+    if (!user) return false;
+    
+    try {
+      const updatedUser = await authService.updateProfile(userData);
       setUser(updatedUser);
       localStorage.setItem('nearbasket_user', JSON.stringify(updatedUser));
+      return true;
+    } catch (error) {
+      console.error('Error updating user:', error);
+      return false;
     }
   };
 
@@ -69,7 +108,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     <AuthContext.Provider value={{
       user,
       isAuthenticated: !!user,
-      login,
+      sendOtp,
+      verifyOtp,
       logout,
       updateUser,
       isLoading,

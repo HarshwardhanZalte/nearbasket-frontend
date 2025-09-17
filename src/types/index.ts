@@ -1,61 +1,147 @@
-// NearBasket Data Models
+// NearBasket Data Models - Updated to match API
 
 export interface User {
-  id: string;
+  id: number;
+  mobile_number: string;
   name: string;
-  phone: string;
   email?: string;
   address?: string;
-  role: 'customer' | 'shopkeeper';
+  profile_image_url?: string;
+  role: 'CUSTOMER' | 'SHOPKEEPER';
+  created_at: string;
+  shop?: Shop | null;
 }
 
 export interface Shop {
-  id: string;
+  id: number;
   name: string;
-  description: string;
   address: string;
-  phone: string;
-  image?: string;
-  owner: string;
-  rating: number;
-  isOpen: boolean;
+  description: string;
+  shop_logo_url?: string;
+  shop_id: string;
+  created_at: string;
+  owner_name?: string;
 }
 
 export interface Product {
-  id: string;
+  id: number;
   name: string;
   description: string;
-  price: number;
-  category: string;
-  image?: string;
-  shopId: string;
-  inStock: boolean;
+  price: string;
+  stock: number;
+  product_image_url?: string;
+  created_at: string;
+  shop_name?: string;
+}
+
+export interface OrderItem {
+  id: number;
+  product: number;
+  product_name: string;
   quantity: number;
+  price: string;
+}
+
+export interface Order {
+  id: number;
+  customer: User;
+  shop: Shop;
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'DELIVERED';
+  total_amount: string;
+  created_at: string;
+  updated_at: string;
+  order_items: OrderItem[];
+}
+
+export interface ShopCustomer {
+  id: number;
+  customer: User;
+  shop_name: string;
+  joined_at: string;
 }
 
 export interface CartItem {
   product: Product;
   quantity: number;
+  shopId: number; // Store the shop's internal ID for order placement
 }
 
-export interface Order {
-  id: string;
-  customerId: string;
-  shopId: string;
-  items: CartItem[];
-  total: number;
-  status: 'pending' | 'accepted' | 'rejected' | 'delivered';
-  createdAt: string;
-  deliveryAddress: string;
-}
-
-export interface Customer {
-  id: string;
+// Request/Response types
+export interface RegisterRequest {
+  mobile_number: string;
   name: string;
-  phone: string;
   email?: string;
   address?: string;
-  totalOrders: number;
+  profile_image_url?: string;
+  role: 'CUSTOMER' | 'SHOPKEEPER';
+  shop_info?: {
+    name: string;
+    address: string;
+    description: string;
+    shop_logo_url?: string;
+  };
 }
 
-export type UserRole = 'customer' | 'shopkeeper';
+export interface SendOtpRequest {
+  mobile_number: string;
+}
+
+export interface SendOtpResponse {
+  message: string;
+  otp: string;
+}
+
+export interface VerifyOtpRequest {
+  mobile_number: string;
+  otp_code: string;
+}
+
+export interface LoginResponse {
+  message: string;
+  access: string;
+  refresh: string;
+  user: User;
+}
+
+export interface UpdateProfileRequest {
+  name?: string;
+  email?: string;
+  address?: string;
+  profile_image_url?: string;
+}
+
+export interface UpdateShopRequest {
+  name?: string;
+  address?: string;
+  description?: string;
+  shop_logo_url?: string;
+}
+
+export interface CreateProductRequest {
+  name: string;
+  price: number;
+  stock: number;
+  product_image_url?: string;
+  description: string;
+}
+
+export interface UpdateProductRequest {
+  name?: string;
+  price?: number;
+  stock?: number;
+  product_image_url?: string;
+  description?: string;
+}
+
+export interface PlaceOrderRequest {
+  items: {
+    product_id: string;
+    quantity: string;
+  }[];
+}
+
+export interface UpdateOrderStatusRequest {
+  status: 'PENDING' | 'ACCEPTED' | 'REJECTED' | 'DELIVERED';
+}
+
+export type UserRole = 'CUSTOMER' | 'SHOPKEEPER';

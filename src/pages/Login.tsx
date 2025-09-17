@@ -15,9 +15,9 @@ export default function Login() {
   const [otp, setOtp] = useState('');
   const [showOtp, setShowOtp] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [selectedRole, setSelectedRole] = useState<UserRole>('customer');
+  const [selectedRole, setSelectedRole] = useState<UserRole>('CUSTOMER');
   
-  const { login } = useAuth();
+  const { sendOtp, verifyOtp } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
 
@@ -32,33 +32,43 @@ export default function Login() {
     }
 
     setLoading(true);
-    // Simulate OTP sending
-    setTimeout(() => {
+    
+    const result = await sendOtp(phone);
+    
+    if (result.success) {
       setShowOtp(true);
-      setLoading(false);
       toast({
         title: "OTP Sent",
-        description: "Enter 1234 to login (demo)",
+        description: result.otp ? `Enter ${result.otp} to login (demo)` : "Check your phone for OTP",
       });
-    }, 1000);
+    } else {
+      toast({
+        title: "Failed to Send OTP",
+        description: result.message,
+        variant: "destructive",
+      });
+    }
+    
+    setLoading(false);
   };
 
   const handleVerifyOtp = async () => {
     setLoading(true);
     
-    const success = await login(phone, otp, selectedRole);
+    const result = await verifyOtp(phone, otp);
     
-    if (success) {
+    if (result.success) {
       toast({
         title: "Login Successful",
         description: `Welcome to NearBasket!`,
       });
       
-      navigate(selectedRole === 'customer' ? '/customer/explore' : '/shopkeeper/dashboard');
+      // Navigate based on user role - will be determined from the API response
+      navigate('/'); // RootRedirect will handle the navigation
     } else {
       toast({
         title: "Invalid OTP",
-        description: "Please check your OTP and try again",
+        description: result.message,
         variant: "destructive",
       });
     }

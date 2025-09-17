@@ -39,7 +39,7 @@ const ProtectedRoute = ({
   requiredRole 
 }: { 
   children: React.ReactNode; 
-  requiredRole?: 'customer' | 'shopkeeper';
+  requiredRole?: 'CUSTOMER' | 'SHOPKEEPER';
 }) => {
   const { isAuthenticated, user } = useAuth();
   
@@ -48,7 +48,7 @@ const ProtectedRoute = ({
   }
   
   if (requiredRole && user?.role !== requiredRole) {
-    const redirectPath = user?.role === 'customer' ? '/customer/explore' : '/shopkeeper/dashboard';
+    const redirectPath = user?.role === 'CUSTOMER' ? '/customer/explore' : '/shopkeeper/dashboard';
     return <Navigate to={redirectPath} replace />;
   }
   
@@ -63,7 +63,7 @@ const RootRedirect = () => {
     return <Navigate to="/login" replace />;
   }
   
-  const redirectPath = user?.role === 'customer' ? '/customer/explore' : '/shopkeeper/dashboard';
+  const redirectPath = user?.role === 'CUSTOMER' ? '/customer/explore' : '/shopkeeper/dashboard';
   return <Navigate to={redirectPath} replace />;
 };
 
@@ -75,7 +75,7 @@ const AppRoutes = () => {
       
       {/* Customer Routes */}
       <Route path="/customer" element={
-        <ProtectedRoute requiredRole="customer">
+        <ProtectedRoute requiredRole="CUSTOMER">
           <CustomerLayout />
         </ProtectedRoute>
       }>
@@ -88,7 +88,7 @@ const AppRoutes = () => {
       
       {/* Shopkeeper Routes */}
       <Route path="/shopkeeper" element={
-        <ProtectedRoute requiredRole="shopkeeper">
+        <ProtectedRoute requiredRole="SHOPKEEPER">
           <ShopkeeperLayout />
         </ProtectedRoute>
       }>

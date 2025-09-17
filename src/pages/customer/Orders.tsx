@@ -4,132 +4,57 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Package, Clock, CheckCircle, XCircle, Truck } from 'lucide-react';
 import { Order } from '@/types';
-
-const mockOrders: Order[] = [
-  {
-    id: 'ord1',
-    customerId: 'cust1',
-    shopId: '1',
-    items: [
-      {
-        product: {
-          id: 'p1',
-          name: 'Fresh Organic Apples',
-          description: 'Premium quality organic apples',
-          price: 3.99,
-          category: 'Fruits',
-          image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300',
-          shopId: '1',
-          inStock: true,
-          quantity: 50,
-        },
-        quantity: 2,
-      },
-      {
-        product: {
-          id: 'p2',
-          name: 'Whole Wheat Bread',
-          description: 'Freshly baked whole wheat bread',
-          price: 2.49,
-          category: 'Bakery',
-          image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=300',
-          shopId: '1',
-          inStock: true,
-          quantity: 20,
-        },
-        quantity: 1,
-      },
-    ],
-    total: 10.47,
-    status: 'pending',
-    createdAt: '2024-01-15T10:30:00Z',
-    deliveryAddress: '123 Main St, Downtown',
-  },
-  {
-    id: 'ord2',
-    customerId: 'cust1',
-    shopId: '2',
-    items: [
-      {
-        product: {
-          id: 'p3',
-          name: 'Organic Spice Mix',
-          description: 'Traditional spice blend',
-          price: 5.99,
-          category: 'Spices',
-          image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=300',
-          shopId: '2',
-          inStock: true,
-          quantity: 15,
-        },
-        quantity: 1,
-      },
-    ],
-    total: 8.98,
-    status: 'accepted',
-    createdAt: '2024-01-14T15:45:00Z',
-    deliveryAddress: '123 Main St, Downtown',
-  },
-  {
-    id: 'ord3',
-    customerId: 'cust1',
-    shopId: '1',
-    items: [
-      {
-        product: {
-          id: 'p4',
-          name: 'Farm Fresh Milk',
-          description: 'Pure milk from local farms',
-          price: 1.99,
-          category: 'Dairy',
-          image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300',
-          shopId: '1',
-          inStock: true,
-          quantity: 30,
-        },
-        quantity: 2,
-      },
-    ],
-    total: 6.97,
-    status: 'delivered',
-    createdAt: '2024-01-12T09:15:00Z',
-    deliveryAddress: '123 Main St, Downtown',
-  },
-];
+import { orderService } from '@/services/order';
+import { useToast } from '@/hooks/use-toast';
+import { ApiError } from '@/services/api';
 
 export default function Orders() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setOrders(mockOrders);
-      setLoading(false);
-    }, 1000);
+    loadOrders();
   }, []);
+
+  const loadOrders = async () => {
+    try {
+      setLoading(true);
+      const response = await orderService.getMyOrders();
+      setOrders(response);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: "Error Loading Orders",
+        description: apiError.message || "Failed to load orders",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const getStatusConfig = (status: Order['status']) => {
     switch (status) {
-      case 'pending':
+      case 'PENDING':
         return {
           icon: Clock,
           color: 'bg-warning text-warning-foreground',
           label: 'Pending',
         };
-      case 'accepted':
+      case 'ACCEPTED':
         return {
           icon: CheckCircle,
           color: 'bg-success text-success-foreground',
           label: 'Accepted',
         };
-      case 'delivered':
+      case 'DELIVERED':
         return {
           icon: Truck,
           color: 'bg-primary text-primary-foreground',
           label: 'Delivered',
         };
-      case 'rejected':
+      case 'REJECTED':
         return {
           icon: XCircle,
           color: 'bg-destructive text-destructive-foreground',
@@ -164,10 +89,10 @@ export default function Orders() {
           <div className="flex items-start justify-between mb-3">
             <div>
               <h3 className="font-semibold text-foreground mb-1">
-                Order #{order.id.slice(-6).toUpperCase()}
+                Order #{order.id.toString().slice(-6).toUpperCase()}
               </h3>
               <p className="text-sm text-muted-foreground">
-                {formatDate(order.createdAt)}
+                {formatDate(order.created_at)}
               </p>
             </div>
             <Badge className={statusConfig.color}>
@@ -176,24 +101,27 @@ export default function Orders() {
             </Badge>
           </div>
 
+          <div className="mb-3 p-2 bg-muted/50 rounded-lg">
+            <p className="text-sm font-medium text-foreground">{order.shop.name}</p>
+            <p className="text-xs text-muted-foreground">{order.shop.address}</p>
+          </div>
+
           <div className="space-y-2 mb-4">
-            {order.items.map((item, index) => (
+            {order.order_items.map((item, index) => (
               <div key={index} className="flex items-center gap-3">
                 <div className="w-12 h-12 bg-gradient-secondary rounded-lg overflow-hidden">
-                  <img 
-                    src={item.product.image} 
-                    alt={item.product.name}
-                    className="w-full h-full object-cover"
-                  />
+                  <div className="w-full h-full flex items-center justify-center text-xs text-muted-foreground">
+                    📦
+                  </div>
                 </div>
                 <div className="flex-1">
-                  <p className="font-medium text-sm">{item.product.name}</p>
+                  <p className="font-medium text-sm">{item.product_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    Qty: {item.quantity} × ${item.product.price}
+                    Qty: {item.quantity} × ₹{item.price}
                   </p>
                 </div>
                 <span className="text-sm font-medium">
-                  ${(item.quantity * item.product.price).toFixed(2)}
+                  ₹{(item.quantity * parseFloat(item.price)).toFixed(2)}
                 </span>
               </div>
             ))}
@@ -201,15 +129,15 @@ export default function Orders() {
 
           <div className="flex items-center justify-between pt-3 border-t border-border">
             <span className="text-sm text-muted-foreground">
-              {order.items.length} item(s)
+              {order.order_items.length} item(s)
             </span>
             <span className="text-lg font-semibold text-primary">
-              ${order.total.toFixed(2)}
+              ₹{order.total_amount}
             </span>
           </div>
 
           <div className="mt-3 text-xs text-muted-foreground">
-            <strong>Delivery:</strong> {order.deliveryAddress}
+            <strong>Customer:</strong> {order.customer.name} ({order.customer.mobile_number})
           </div>
         </CardContent>
       </Card>
@@ -254,7 +182,13 @@ export default function Orders() {
 
   const filterOrders = (status: string) => {
     if (status === 'all') return orders;
-    return orders.filter(order => order.status === status);
+    const statusMap: Record<string, Order['status']> = {
+      'pending': 'PENDING',
+      'accepted': 'ACCEPTED',
+      'delivered': 'DELIVERED',
+      'rejected': 'REJECTED',
+    };
+    return orders.filter(order => order.status === statusMap[status]);
   };
 
   return (

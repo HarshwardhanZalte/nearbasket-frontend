@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +10,8 @@ import { Plus, Minus, Trash2, ShoppingBag } from 'lucide-react';
 import { useCart } from '@/contexts/CartContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { orderService } from '@/services/order';
+import { ApiError } from '@/services/api';
 
 export default function Cart() {
   const { items, updateQuantity, removeFromCart, totalPrice, clearCart } = useCart();
@@ -20,10 +22,18 @@ export default function Cart() {
   const [deliveryAddress, setDeliveryAddress] = useState(user?.address || '');
   const [specialInstructions, setSpecialInstructions] = useState('');
   const [isPlacingOrder, setIsPlacingOrder] = useState(false);
+  const [currentShopId, setCurrentShopId] = useState<number | null>(null);
 
   const deliveryFee = 2.99;
   const tax = totalPrice * 0.08;
   const grandTotal = totalPrice + deliveryFee + tax;
+
+  useEffect(() => {
+    // Get the shop ID from the first item in cart
+    if (items.length > 0) {
+      setCurrentShopId(items[0].shopId);
+    }
+  }, [items]);
 
   const handlePlaceOrder = async () => {
     if (!deliveryAddress.trim()) {
@@ -35,18 +45,43 @@ export default function Cart() {
       return;
     }
 
+    if (!currentShopId) {
+      toast({
+        title: "Shop Error",
+        description: "Unable to determine shop for this order",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setIsPlacingOrder(true);
 
-    // Simulate order placement
-    setTimeout(() => {
+    try {
+      const orderItems = items.map(item => ({
+        product_id: item.product.id.toString(),
+        quantity: item.quantity.toString(),
+      }));
+
+      await orderService.placeOrder(currentShopId, {
+        items: orderItems,
+      });
+
       clearCart();
-      setIsPlacingOrder(false);
       toast({
         title: "Order Placed!",
         description: "Your order has been placed successfully",
       });
       navigate('/customer/orders');
-    }, 2000);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: "Order Failed",
+        description: apiError.message || "Failed to place order",
+        variant: "destructive",
+      });
+    } finally {
+      setIsPlacingOrder(false);
+    }
   };
 
   const CartItem = ({ item }: { item: typeof items[0] }) => (
@@ -55,7 +90,7 @@ export default function Cart() {
         <div className="flex gap-4">
           <div className="w-20 h-20 bg-gradient-secondary rounded-lg overflow-hidden">
             <img 
-              src={item.product.image} 
+              src={item.product.product_image_url || 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300'} 
               alt={item.product.name}
               className="w-full h-full object-cover"
             />
@@ -66,7 +101,7 @@ export default function Cart() {
               {item.product.name}
             </h3>
             <p className="text-sm text-muted-foreground mb-2">
-              ${item.product.price} each
+              ₹{item.product.price} each
             </p>
             
             <div className="flex items-center justify-between">
@@ -92,7 +127,7 @@ export default function Cart() {
               
               <div className="flex items-center gap-3">
                 <span className="font-semibold text-primary">
-                  ${(item.product.price * item.quantity).toFixed(2)}
+                  ₹{(parseFloat(item.product.price) * item.quantity).toFixed(2)}
                 </span>
                 <Button
                   variant="ghost"
@@ -183,22 +218,22 @@ export default function Cart() {
           <div className="space-y-2">
             <div className="flex justify-between">
               <span>Subtotal ({items.reduce((sum, item) => sum + item.quantity, 0)} items)</span>
-              <span>${totalPrice.toFixed(2)}</span>
+              <span>₹{totalPrice.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span>Delivery Fee</span>
-              <span>${deliveryFee.toFixed(2)}</span>
+              <span>₹{deliveryFee.toFixed(2)}</span>
             </div>
             <div className="flex justify-between">
               <span>Tax</span>
-              <span>${tax.toFixed(2)}</span>
+              <span>₹{tax.toFixed(2)}</span>
             </div>
             
             <Separator className="my-3" />
             
             <div className="flex justify-between text-lg font-semibold text-primary">
               <span>Total</span>
-              <span>${grandTotal.toFixed(2)}</span>
+              <span>₹{grandTotal.toFixed(2)}</span>
             </div>
           </div>
         </CardContent>
@@ -211,7 +246,7 @@ export default function Cart() {
           disabled={isPlacingOrder || !deliveryAddress.trim()}
           className="w-full h-12"
         >
-          {isPlacingOrder ? 'Placing Order...' : `Place Order • $${grandTotal.toFixed(2)}`}
+          {isPlacingOrder ? 'Placing Order...' : `Place Order • ₹${grandTotal.toFixed(2)}`}
         </Button>
       </div>
     </div>

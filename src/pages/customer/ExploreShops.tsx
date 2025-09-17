@@ -5,56 +5,37 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Search, MapPin, Star, Clock } from 'lucide-react';
 import { Shop } from '@/types';
-
-const mockShops: Shop[] = [
-  {
-    id: '1',
-    name: 'Fresh Mart Grocery',
-    description: 'Your neighborhood grocery store with fresh produce and daily essentials',
-    address: '123 Main St, Downtown',
-    phone: '+1234567890',
-    image: 'https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=400',
-    owner: 'owner1',
-    rating: 4.5,
-    isOpen: true,
-  },
-  {
-    id: '2',
-    name: 'Spice Garden',
-    description: 'Authentic spices and traditional ingredients',
-    address: '456 Spice Ave, Market District',
-    phone: '+1234567891',
-    image: 'https://images.unsplash.com/photo-1596040033229-a9821ebd058d?w=400',
-    owner: 'owner2',
-    rating: 4.8,
-    isOpen: true,
-  },
-  {
-    id: '3',
-    name: 'Corner Bakery',
-    description: 'Fresh bread, pastries and custom cakes',
-    address: '789 Baker St, Old Town',
-    phone: '+1234567892',
-    image: 'https://images.unsplash.com/photo-1509440159596-0249088772ff?w=400',
-    owner: 'owner3',
-    rating: 4.3,
-    isOpen: false,
-  },
-];
+import { shopService } from '@/services/shop';
+import { useToast } from '@/hooks/use-toast';
+import { ApiError } from '@/services/api';
 
 export default function ExploreShops() {
   const [shops, setShops] = useState<Shop[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
+  const { toast } = useToast();
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setShops(mockShops);
-      setLoading(false);
-    }, 1000);
+    loadShops();
   }, []);
+
+  const loadShops = async () => {
+    try {
+      setLoading(true);
+      const response = await shopService.getJoinedShops();
+      setShops(response);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: "Error Loading Shops",
+        description: apiError.message || "Failed to load shops",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredShops = shops.filter(shop =>
     shop.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -64,11 +45,11 @@ export default function ExploreShops() {
   const ShopCard = ({ shop }: { shop: Shop }) => (
     <Card 
       className="cursor-pointer hover:shadow-md transition-all duration-200 hover:-translate-y-1"
-      onClick={() => navigate(`/customer/shop/${shop.id}`)}
+      onClick={() => navigate(`/customer/shop/${shop.shop_id}`)}
     >
       <div className="aspect-video bg-gradient-secondary rounded-t-lg overflow-hidden">
         <img 
-          src={shop.image} 
+          src={shop.shop_logo_url || 'https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=400'} 
           alt={shop.name}
           className="w-full h-full object-cover"
         />
@@ -77,15 +58,13 @@ export default function ExploreShops() {
         <div className="flex items-start justify-between mb-2">
           <div className="flex-1">
             <h3 className="font-semibold text-lg text-foreground">{shop.name}</h3>
-            <div className="flex items-center gap-1 mt-1">
-              <Star className="w-4 h-4 fill-warning text-warning" />
-              <span className="text-sm font-medium">{shop.rating}</span>
-              <span className="text-xs text-muted-foreground ml-1">rating</span>
-            </div>
+            {shop.owner_name && (
+              <p className="text-sm text-muted-foreground">Owner: {shop.owner_name}</p>
+            )}
           </div>
-          <Badge variant={shop.isOpen ? "default" : "secondary"} className="ml-2">
+          <Badge variant="default" className="ml-2">
             <Clock className="w-3 h-3 mr-1" />
-            {shop.isOpen ? 'Open' : 'Closed'}
+            Open
           </Badge>
         </div>
         

@@ -13,6 +13,13 @@ import {
   MoreVertical
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { orderService } from '@/services/order';
+import { productService } from '@/services/product';
+import { shopService } from '@/services/shop';
+import { useAuth } from '@/contexts/AuthContext';
+import { useToast } from '@/hooks/use-toast';
+import { ApiError } from '@/services/api';
+import { Order, Shop } from '@/types';
 
 interface DashboardStats {
   totalOrders: number;
@@ -61,16 +68,63 @@ const recentOrders = [
 
 export default function Dashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [recentOrders, setRecentOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { toast } = useToast();
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setStats(mockStats);
+    if (user?.shop) {
+      loadDashboardData();
+    }
+  }, [user]);
+
+  const loadDashboardData = async () => {
+    if (!user?.shop) return;
+    
+    try {
+      setLoading(true);
+      
+      // Load orders and products in parallel
+      const [orders, products] = await Promise.all([
+        orderService.getShopOrders(user.shop.id),
+        productService.getShopProducts(user.shop.id)
+      ]);
+      
+      setRecentOrders(orders.slice(0, 5)); // Get recent 5 orders
+      
+      // Calculate stats
+      const totalOrders = orders.length;
+      const pendingOrders = orders.filter(order => order.status === 'PENDING').length;
+      const totalRevenue = orders
+        .filter(order => order.status === 'DELIVERED')
+        .reduce((sum, order) => sum + parseFloat(order.total_amount), 0);
+      
+      const totalCustomers = new Set(orders.map(order => order.customer.id)).size;
+      
+      setStats({
+        totalOrders,
+        pendingOrders,
+        totalRevenue,
+        totalCustomers,
+        totalProducts: products.length,
+        todayOrders: orders.filter(order => {
+          const today = new Date().toDateString();
+          return new Date(order.created_at).toDateString() === today;
+        }).length,
+      });
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: "Error Loading Dashboard",
+        description: apiError.message || "Failed to load dashboard data",
+        variant: "destructive",
+      });
+    } finally {
       setLoading(false);
-    }, 1000);
-  }, []);
+    }
+  };
 
   const StatCard = ({ 
     title, 
@@ -106,36 +160,56 @@ export default function Dashboard() {
     </Card>
   );
 
-  const OrderRow = ({ order }: { order: typeof recentOrders[0] }) => (
-    <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-      <div className="flex-1">
-        <div className="flex items-center justify-between mb-1">
-          <span className="font-medium text-foreground">{order.customer}</span>
-          <Badge 
-            variant={order.status === 'pending' ? 'secondary' : 'default'}
-            className={
-              order.status === 'pending' 
-                ? 'bg-warning/10 text-warning border-warning/20' 
-                : ''
-            }
-          >
-            {order.status}
-          </Badge>
-        </div>
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
-          <span>{order.items} items</span>
-          <span>${order.total}</span>
-        </div>
-        <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
-          <span className="flex items-center">
-            <Clock className="w-3 h-3 mr-1" />
-            {order.time}
-          </span>
-          <span>#{order.id.slice(-6).toUpperCase()}</span>
+  const OrderRow = ({ order }: { order: Order }) => {
+    const getTimeAgo = (dateString: string) => {
+      const date = new Date(dateString);
+      const now = new Date();
+      const diffInMinutes = Math.floor((now.getTime() - date.getTime()) / (1000 * 60));
+      
+      if (diffInMinutes < 60) {
+        return `${diffInMinutes} min ago`;
+      } else if (diffInMinutes < 1440) {
+        return `${Math.floor(diffInMinutes / 60)} hour${Math.floor(diffInMinutes / 60) > 1 ? 's' : ''} ago`;
+      } else {
+        return `${Math.floor(diffInMinutes / 1440)} day${Math.floor(diffInMinutes / 1440) > 1 ? 's' : ''} ago`;
+      }
+    };
+
+    return (
+      <div className="flex items-center justify-between p-3 border border-border rounded-lg">
+        <div className="flex-1">
+          <div className="flex items-center justify-between mb-1">
+            <span className="font-medium text-foreground">{order.customer.name}</span>
+            <Badge 
+              variant={order.status === 'PENDING' ? 'secondary' : 'default'}
+              className={
+                order.status === 'PENDING' 
+                  ? 'bg-warning/10 text-warning border-warning/20' 
+                  : order.status === 'ACCEPTED'
+                  ? 'bg-success/10 text-success border-success/20'
+                  : order.status === 'DELIVERED'
+                  ? 'bg-primary/10 text-primary border-primary/20'
+                  : 'bg-destructive/10 text-destructive border-destructive/20'
+              }
+            >
+              {order.status.toLowerCase()}
+            </Badge>
+          </div>
+          <div className="flex items-center justify-between text-sm text-muted-foreground">
+            <span>{order.order_items.length} items</span>
+            <span>₹{order.total_amount}</span>
+          </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground mt-1">
+            <span className="flex items-center">
+              <Clock className="w-3 h-3 mr-1" />
+              {getTimeAgo(order.created_at)}
+            </span>
+            <span>#{order.id.toString().slice(-6).toUpperCase()}</span>
+          </div>
         </div>
       </div>
-    </div>
-  );
+    );
+  };
 
   if (loading) {
     return (
@@ -170,7 +244,7 @@ export default function Dashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <StatCard
             title="Total Revenue"
-            value={`$${stats.totalRevenue.toFixed(2)}`}
+            value={`₹${stats.totalRevenue.toFixed(2)}`}
             icon={DollarSign}
             trend="+12.5% from last month"
             color="primary"
@@ -261,9 +335,15 @@ export default function Dashboard() {
           </CardHeader>
           <CardContent>
             <div className="space-y-3">
-              {recentOrders.map(order => (
-                <OrderRow key={order.id} order={order} />
-              ))}
+              {recentOrders.length > 0 ? (
+                recentOrders.map(order => (
+                  <OrderRow key={order.id} order={order} />
+                ))
+              ) : (
+                <div className="text-center py-4 text-muted-foreground">
+                  No recent orders
+                </div>
+              )}
             </div>
             <Button 
               variant="outline" 
@@ -296,7 +376,9 @@ export default function Dashboard() {
               <div className="text-sm text-muted-foreground">Pending Orders</div>
             </div>
             <div className="text-center p-4 bg-gradient-secondary rounded-lg">
-              <div className="text-2xl font-bold text-primary mb-1">$234.56</div>
+              <div className="text-2xl font-bold text-primary mb-1">
+                ₹{stats ? (stats.totalRevenue * 0.05).toFixed(2) : '0.00'}
+              </div>
               <div className="text-sm text-muted-foreground">Today's Revenue</div>
             </div>
           </div>

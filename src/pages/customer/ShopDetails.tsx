@@ -8,65 +8,9 @@ import { ArrowLeft, Star, MapPin, Phone, Plus, Minus, ShoppingCart, Search } fro
 import { useCart } from '@/contexts/CartContext';
 import { useToast } from '@/hooks/use-toast';
 import { Product, Shop } from '@/types';
-
-const mockShop: Shop = {
-  id: '1',
-  name: 'Fresh Mart Grocery',
-  description: 'Your neighborhood grocery store with fresh produce and daily essentials',
-  address: '123 Main St, Downtown',
-  phone: '+1234567890',
-  image: 'https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=600',
-  owner: 'owner1',
-  rating: 4.5,
-  isOpen: true,
-};
-
-const mockProducts: Product[] = [
-  {
-    id: 'p1',
-    name: 'Fresh Organic Apples',
-    description: 'Premium quality organic apples, perfect for snacking',
-    price: 3.99,
-    category: 'Fruits',
-    image: 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300',
-    shopId: '1',
-    inStock: true,
-    quantity: 50,
-  },
-  {
-    id: 'p2',
-    name: 'Whole Wheat Bread',
-    description: 'Freshly baked whole wheat bread, soft and nutritious',
-    price: 2.49,
-    category: 'Bakery',
-    image: 'https://images.unsplash.com/photo-1549931319-a545dcf3bc73?w=300',
-    shopId: '1',
-    inStock: true,
-    quantity: 20,
-  },
-  {
-    id: 'p3',
-    name: 'Farm Fresh Milk',
-    description: 'Pure and fresh milk from local farms',
-    price: 1.99,
-    category: 'Dairy',
-    image: 'https://images.unsplash.com/photo-1563636619-e9143da7973b?w=300',
-    shopId: '1',
-    inStock: true,
-    quantity: 30,
-  },
-  {
-    id: 'p4',
-    name: 'Organic Tomatoes',
-    description: 'Fresh, juicy organic tomatoes',
-    price: 2.99,
-    category: 'Vegetables',
-    image: 'https://images.unsplash.com/photo-1546470427-e4b8b1029d59?w=300',
-    shopId: '1',
-    inStock: false,
-    quantity: 0,
-  },
-];
+import { shopService } from '@/services/shop';
+import { productService } from '@/services/product';
+import { ApiError } from '@/services/api';
 
 export default function ShopDetails() {
   const { shopId } = useParams();
@@ -81,32 +25,55 @@ export default function ShopDetails() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setShop(mockShop);
-      setProducts(mockProducts);
-      setLoading(false);
-    }, 1000);
+    if (shopId) {
+      loadShopDetails();
+    }
   }, [shopId]);
+
+  const loadShopDetails = async () => {
+    if (!shopId) return;
+    
+    try {
+      setLoading(true);
+      // First get shop details to get the internal shop ID
+      const shopData = await shopService.getShopDetails(shopId);
+      setShop(shopData);
+      
+      // Then get products using the shop's internal ID
+      const productsData = await productService.getShopProducts(shopData.id);
+      setProducts(productsData);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: "Error Loading Shop",
+        description: apiError.message || "Failed to load shop details",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const filteredProducts = products.filter(product =>
     product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     product.description.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const getCartQuantity = (productId: string) => {
+  const getCartQuantity = (productId: number) => {
     return items.find(item => item.product.id === productId)?.quantity || 0;
   };
 
-  const updateQuantity = (productId: string, change: number) => {
+  const updateQuantity = (productId: number, change: number) => {
     const currentQty = quantities[productId] || 0;
     const newQty = Math.max(0, currentQty + change);
     setQuantities(prev => ({ ...prev, [productId]: newQty }));
   };
 
   const handleAddToCart = (product: Product) => {
+    if (!shop) return;
+    
     const quantity = quantities[product.id] || 1;
-    addToCart(product, quantity);
+    addToCart(product, shop.id, quantity);
     setQuantities(prev => ({ ...prev, [product.id]: 0 }));
     toast({
       title: "Added to Cart",
@@ -117,12 +84,13 @@ export default function ShopDetails() {
   const ProductCard = ({ product }: { product: Product }) => {
     const cartQty = getCartQuantity(product.id);
     const selectedQty = quantities[product.id] || 0;
+    const inStock = product.stock > 0;
 
     return (
       <Card className="overflow-hidden">
         <div className="aspect-square bg-gradient-secondary overflow-hidden">
           <img 
-            src={product.image} 
+            src={product.product_image_url || 'https://images.unsplash.com/photo-1560806887-1e4cd0b6cbd6?w=300'} 
             alt={product.name}
             className="w-full h-full object-cover"
           />
@@ -137,10 +105,10 @@ export default function ShopDetails() {
             </p>
             <div className="flex items-center justify-between">
               <span className="text-lg font-bold text-primary">
-                ${product.price}
+                ₹{product.price}
               </span>
-              <Badge variant={product.inStock ? "default" : "secondary"}>
-                {product.inStock ? 'In Stock' : 'Out of Stock'}
+              <Badge variant={inStock ? "default" : "secondary"}>
+                {inStock ? `${product.stock} in stock` : 'Out of Stock'}
               </Badge>
             </div>
           </div>
@@ -153,7 +121,7 @@ export default function ShopDetails() {
             </div>
           )}
 
-          {product.inStock && (
+          {inStock && (
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Button
@@ -232,7 +200,7 @@ export default function ShopDetails() {
         <Card className="mb-6">
           <div className="aspect-video bg-gradient-secondary overflow-hidden">
             <img 
-              src={shop.image} 
+              src={shop.shop_logo_url || 'https://images.unsplash.com/photo-1534723452862-4c874018d66d?w=600'} 
               alt={shop.name}
               className="w-full h-full object-cover"
             />
@@ -242,11 +210,12 @@ export default function ShopDetails() {
               <div className="flex-1">
                 <h2 className="text-2xl font-bold text-foreground mb-2">{shop.name}</h2>
                 <div className="flex items-center gap-2 mb-2">
-                  <Star className="w-5 h-5 fill-warning text-warning" />
-                  <span className="font-medium">{shop.rating}</span>
-                  <Badge variant={shop.isOpen ? "default" : "secondary"}>
-                    {shop.isOpen ? 'Open' : 'Closed'}
+                  <Badge variant="default">
+                    Open
                   </Badge>
+                  {shop.owner_name && (
+                    <span className="text-sm text-muted-foreground">Owner: {shop.owner_name}</span>
+                  )}
                 </div>
               </div>
             </div>
@@ -259,8 +228,7 @@ export default function ShopDetails() {
                 <span>{shop.address}</span>
               </div>
               <div className="flex items-center gap-2">
-                <Phone className="w-4 h-4 text-muted-foreground" />
-                <span>{shop.phone}</span>
+                <span className="text-xs text-muted-foreground">Shop ID: {shop.shop_id}</span>
               </div>
             </div>
           </CardContent>
