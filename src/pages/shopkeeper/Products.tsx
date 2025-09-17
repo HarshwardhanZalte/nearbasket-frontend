@@ -190,12 +190,7 @@ export default function Products() {
           </div>
           <div className="text-sm text-muted-foreground">Total Products</div>
         </Card>
-        <Card className="p-4 text-center">
-          <div className="text-2xl font-bold text-success">
-            {products.filter(p => p.stock > 0).length}
-          </div>
-          <div className="text-sm text-muted-foreground">In Stock</div>
-        </Card>
+        {/* Removed In-stock count card per requirement */}
       </div>
 
       {/* Products Grid */}

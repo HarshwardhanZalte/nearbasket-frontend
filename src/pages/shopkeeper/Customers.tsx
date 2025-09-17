@@ -15,143 +15,130 @@ import {
   Users,
   ShoppingBag
 } from 'lucide-react';
-import { Customer } from '@/types';
+import { ShopCustomer, User } from '@/types';
 import { useToast } from '@/hooks/use-toast';
+import { shopService } from '@/services/shop';
+import { ApiError } from '@/services/api';
 
-const mockCustomers: Customer[] = [
-  {
-    id: 'cust1',
-    name: 'John Doe',
-    phone: '+1234567890',
-    email: 'john.doe@example.com',
-    address: '123 Main St, Downtown',
-    totalOrders: 15,
-  },
-  {
-    id: 'cust2',
-    name: 'Sarah Smith',
-    phone: '+1234567891',
-    email: 'sarah.smith@example.com',
-    address: '456 Oak Ave, Uptown',
-    totalOrders: 8,
-  },
-  {
-    id: 'cust3',
-    name: 'Mike Johnson',
-    phone: '+1234567892',
-    email: 'mike.johnson@example.com',
-    address: '789 Pine St, Midtown',
-    totalOrders: 23,
-  },
-  {
-    id: 'cust4',
-    name: 'Emily Davis',
-    phone: '+1234567893',
-    email: 'emily.davis@example.com',
-    totalOrders: 4,
-  },
-];
+// Backend-driven list
 
 export default function Customers() {
-  const [customers, setCustomers] = useState<Customer[]>([]);
+  const [customers, setCustomers] = useState<ShopCustomer[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(true);
   const [showAddDialog, setShowAddDialog] = useState(false);
   const { toast } = useToast();
 
-  const [newCustomer, setNewCustomer] = useState({
-    name: '',
-    phone: '',
-    email: '',
-    address: '',
-  });
+  const [mobileNumber, setMobileNumber] = useState('');
 
   useEffect(() => {
-    // Simulate API call
-    setTimeout(() => {
-      setCustomers(mockCustomers);
-      setLoading(false);
-    }, 1000);
+    loadCustomers();
   }, []);
 
-  const filteredCustomers = customers.filter(customer =>
+  const loadCustomers = async () => {
+    try {
+      setLoading(true);
+      const response = await shopService.getCustomers();
+      setCustomers(response);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: 'Error Loading Customers',
+        description: apiError.message || 'Failed to load customers',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredCustomers = customers.filter(({ customer }) =>
     customer.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    customer.phone.includes(searchQuery) ||
+    (customer.mobile_number && customer.mobile_number.includes(searchQuery)) ||
     (customer.email && customer.email.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const handleAddCustomer = () => {
-    if (!newCustomer.name || !newCustomer.phone) {
+  const handleAddCustomer = async () => {
+    const isValid = /^\d{10}$/.test(mobileNumber.trim());
+    if (!isValid) {
       toast({
-        title: "Missing Information",
-        description: "Please provide at least name and phone number",
+        title: 'Invalid Mobile Number',
+        description: 'Enter a valid 10-digit mobile number',
         variant: "destructive",
       });
       return;
     }
-
-    const customer: Customer = {
-      id: `cust${Date.now()}`,
-      ...newCustomer,
-      totalOrders: 0,
-    };
-
-    setCustomers(prev => [...prev, customer]);
-    setNewCustomer({ name: '', phone: '', email: '', address: '' });
-    setShowAddDialog(false);
-    
-    toast({
-      title: "Customer Added",
-      description: `${customer.name} has been added to your customer list`,
-    });
-  };
-
-  const handleDeleteCustomer = (customerId: string, customerName: string) => {
-    if (window.confirm(`Are you sure you want to remove ${customerName} from your customer list?`)) {
-      setCustomers(prev => prev.filter(c => c.id !== customerId));
+    try {
+      const res = await shopService.addCustomer(mobileNumber.trim());
+      // Reload list to reflect server state
+      await loadCustomers();
+      setMobileNumber('');
+      setShowAddDialog(false);
       toast({
-        title: "Customer Removed",
-        description: `${customerName} has been removed from your customer list`,
+        title: 'Customer Added',
+        description: `${res.customer.name || res.customer.mobile_number} has been added`,
+      });
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: 'Add Failed',
+        description: apiError.message || 'Failed to add customer',
+        variant: 'destructive',
       });
     }
   };
 
-  const CustomerCard = ({ customer }: { customer: Customer }) => (
+  const handleDeleteCustomer = async (userId: number, customerName: string) => {
+    if (!window.confirm(`Remove ${customerName} from your customer list?`)) return;
+    try {
+      await shopService.removeCustomer(userId);
+      setCustomers(prev => prev.filter(c => c.customer.id !== userId));
+      toast({
+        title: 'Customer Removed',
+        description: `${customerName} has been removed`,
+      });
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({
+        title: 'Remove Failed',
+        description: apiError.message || 'Failed to remove customer',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  const CustomerCard = ({ customer }: { customer: ShopCustomer }) => (
     <Card className="hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-start justify-between mb-3">
           <div className="flex-1">
             <h3 className="font-semibold text-foreground text-lg mb-1">
-              {customer.name}
+              {customer.customer.name}
             </h3>
             <div className="space-y-1">
               <div className="flex items-center gap-2 text-sm">
                 <Phone className="w-4 h-4 text-muted-foreground" />
-                <span>{customer.phone}</span>
+                <span>{customer.customer.mobile_number}</span>
               </div>
-              {customer.email && (
+              {customer.customer.email && (
                 <div className="flex items-center gap-2 text-sm">
                   <Mail className="w-4 h-4 text-muted-foreground" />
-                  <span>{customer.email}</span>
+                  <span>{customer.customer.email}</span>
                 </div>
               )}
-              {customer.address && (
+              {customer.customer.address && (
                 <div className="flex items-start gap-2 text-sm">
                   <MapPin className="w-4 h-4 text-muted-foreground mt-0.5" />
-                  <span className="flex-1">{customer.address}</span>
+                  <span className="flex-1">{customer.customer.address}</span>
                 </div>
               )}
             </div>
           </div>
           <div className="flex items-center gap-2 ml-4">
-            <Badge variant="secondary" className="flex items-center gap-1">
-              <ShoppingBag className="w-3 h-3" />
-              {customer.totalOrders}
-            </Badge>
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => handleDeleteCustomer(customer.id, customer.name)}
+              onClick={() => handleDeleteCustomer(customer.customer.id, customer.customer.name)}
               className="text-destructive hover:text-destructive hover:bg-destructive/10"
             >
               <Trash2 className="w-4 h-4" />
@@ -200,43 +187,12 @@ export default function Customers() {
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div>
-                <Label htmlFor="customerName">Name *</Label>
-                <Input
-                  id="customerName"
-                  value={newCustomer.name}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, name: e.target.value }))}
-                  placeholder="Enter customer name"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="customerPhone">Phone Number *</Label>
+                <Label htmlFor="customerPhone">Customer Mobile Number *</Label>
                 <Input
                   id="customerPhone"
-                  value={newCustomer.phone}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, phone: e.target.value }))}
-                  placeholder="Enter phone number"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="customerEmail">Email (Optional)</Label>
-                <Input
-                  id="customerEmail"
-                  type="email"
-                  value={newCustomer.email}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, email: e.target.value }))}
-                  placeholder="Enter email address"
-                  className="mt-1"
-                />
-              </div>
-              <div>
-                <Label htmlFor="customerAddress">Address (Optional)</Label>
-                <Input
-                  id="customerAddress"
-                  value={newCustomer.address}
-                  onChange={(e) => setNewCustomer(prev => ({ ...prev, address: e.target.value }))}
-                  placeholder="Enter customer address"
+                  value={mobileNumber}
+                  onChange={(e) => setMobileNumber(e.target.value)}
+                  placeholder="10-digit mobile number"
                   className="mt-1"
                 />
               </div>
@@ -280,23 +236,10 @@ export default function Customers() {
 
       {/* Customer Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
-        <Card className="p-4 text-center">
-          <div className="text-xl font-bold text-success">
-            {customers.filter(c => c.totalOrders > 10).length}
-          </div>
-          <div className="text-sm text-muted-foreground">Loyal Customers</div>
-          <div className="text-xs text-muted-foreground mt-1">(10+ orders)</div>
-        </Card>
-        <Card className="p-4 text-center">
-          <div className="text-xl font-bold text-warning">
-            {customers.filter(c => c.totalOrders >= 1 && c.totalOrders <= 5).length}
-          </div>
-          <div className="text-sm text-muted-foreground">Regular Customers</div>
-          <div className="text-xs text-muted-foreground mt-1">(1-5 orders)</div>
-        </Card>
+        {/* Removed Loyal & Regular customer count cards per requirement */}
         <Card className="p-4 text-center">
           <div className="text-xl font-bold text-muted-foreground">
-            {customers.filter(c => c.totalOrders === 0).length}
+            {customers.length}
           </div>
           <div className="text-sm text-muted-foreground">New Customers</div>
           <div className="text-xs text-muted-foreground mt-1">(No orders yet)</div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,6 +21,18 @@ export default function Login() {
   const { toast } = useToast();
   const navigate = useNavigate();
 
+  const phoneInputRef = useRef<HTMLInputElement>(null);
+  const otpInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!showOtp) {
+      phoneInputRef.current?.focus();
+    } else {
+      // Focus OTP after switching view
+      setTimeout(() => otpInputRef.current?.focus(), 0);
+    }
+  }, [showOtp]);
+
   const handleSendOtp = async () => {
     if (!phone || phone.length < 10) {
       toast({
@@ -37,10 +49,12 @@ export default function Login() {
     
     if (result.success) {
       setShowOtp(true);
-      toast({
-        title: "OTP Sent",
-        description: result.otp ? `Enter ${result.otp} to login (demo)` : "Check your phone for OTP",
-      });
+      // Do not expose OTP in UI; rely on user input. Optionally log for dev only.
+      if (import.meta.env.DEV && result.otp) {
+        // eslint-disable-next-line no-console
+        console.log('Dev OTP:', result.otp);
+      }
+      toast({ title: 'OTP Sent', description: 'Please enter the 6-digit OTP.' });
     } else {
       toast({
         title: "Failed to Send OTP",
@@ -122,7 +136,7 @@ export default function Login() {
     return (
       <div className="space-y-4">
         <div className="space-y-2">
-          <Label htmlFor="phone">Phone Number</Label>
+            <Label htmlFor="phone">Phone Number</Label>
           <Input
             id="phone"
             type="tel"
@@ -130,6 +144,7 @@ export default function Login() {
             value={phone}
             onChange={(e) => setPhone(e.target.value)}
             disabled={showOtp}
+              ref={phoneInputRef}
           />
         </div>
 
@@ -142,11 +157,10 @@ export default function Login() {
               placeholder="Enter 4-digit OTP"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              maxLength={4}
+              maxLength={6}
+                autoFocus
+                ref={otpInputRef}
             />
-            <p className="text-xs text-muted-foreground">
-              Demo: Use 1234 as OTP
-            </p>
           </div>
         )}
 

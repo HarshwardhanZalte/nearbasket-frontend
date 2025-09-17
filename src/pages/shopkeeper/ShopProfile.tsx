@@ -1,14 +1,15 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
 import { Separator } from '@/components/ui/separator';
-import { Store, Phone, Mail, MapPin, Clock, Edit3, Save, X } from 'lucide-react';
+import { Store, Phone, Mail, MapPin, Edit3, Save, X } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
+import { shopService } from '@/services/shop';
+import { ApiError } from '@/services/api';
 
 export default function ShopProfile() {
   const { user, logout } = useAuth();
@@ -16,34 +17,53 @@ export default function ShopProfile() {
   
   const [isEditing, setIsEditing] = useState(false);
   const [shopData, setShopData] = useState({
-    shopName: 'Fresh Mart Grocery',
-    description: 'Your neighborhood grocery store with fresh produce and daily essentials',
-    phone: user?.phone || '+1234567890',
-    email: user?.email || 'freshmart@example.com',
-    address: '123 Main St, Downtown, City 12345',
-    openingHours: '8:00 AM - 9:00 PM',
-    isOpen: true,
+    name: '',
+    description: '',
+    phone: '',
+    email: '',
+    address: '',
+    shop_id: '',
   });
 
-  const handleSave = () => {
-    setIsEditing(false);
-    toast({
-      title: "Shop Profile Updated",
-      description: "Your shop information has been saved successfully",
-    });
+  useEffect(() => {
+    const load = async () => {
+      try {
+        const myShop = await shopService.getMyShop();
+        if (myShop && !Array.isArray(myShop)) {
+          setShopData({
+            name: myShop.name,
+            description: myShop.description,
+            phone: user?.mobile_number || '',
+            email: user?.email || '',
+            address: myShop.address,
+            shop_id: myShop.shop_id,
+          });
+        }
+      } catch (error) {
+        const apiError = error as ApiError;
+        toast({ title: 'Failed to load shop', description: apiError.message || 'Could not fetch shop', variant: 'destructive' });
+      }
+    };
+    load();
+  }, []);
+
+  const handleSave = async () => {
+    try {
+      const updated = await shopService.updateMyShop({
+        name: shopData.name,
+        address: shopData.address,
+        description: shopData.description,
+      });
+      setShopData(prev => ({ ...prev, name: updated.name, address: updated.address, description: updated.description }));
+      toast({ title: 'Shop Profile Updated', description: 'Saved successfully' });
+      setIsEditing(false);
+    } catch (error) {
+      const apiError = error as ApiError;
+      toast({ title: 'Update Failed', description: apiError.message || 'Could not update shop', variant: 'destructive' });
+    }
   };
 
   const handleCancel = () => {
-    // Reset to original data
-    setShopData({
-      shopName: 'Fresh Mart Grocery',
-      description: 'Your neighborhood grocery store with fresh produce and daily essentials',
-      phone: user?.phone || '+1234567890',
-      email: user?.email || 'freshmart@example.com',
-      address: '123 Main St, Downtown, City 12345',
-      openingHours: '8:00 AM - 9:00 PM',
-      isOpen: true,
-    });
     setIsEditing(false);
   };
 
@@ -80,24 +100,10 @@ export default function ShopProfile() {
             </div>
             <div className="flex-1">
               <h2 className="text-2xl font-bold text-foreground mb-2">
-                {shopData.shopName}
+                {shopData.name || 'My Shop'}
               </h2>
-              <p className="text-muted-foreground mb-3">
-                {shopData.description}
-              </p>
-              <div className="flex items-center gap-4">
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${shopData.isOpen ? 'bg-success' : 'bg-destructive'}`} />
-                  <span className="text-sm font-medium">
-                    {shopData.isOpen ? 'Open' : 'Closed'}
-                  </span>
-                </div>
-                <span className="text-sm text-muted-foreground">•</span>
-                <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                  <Clock className="w-4 h-4" />
-                  {shopData.openingHours}
-                </div>
-              </div>
+              <p className="text-muted-foreground mb-1">Shop ID: {shopData.shop_id}</p>
+              <p className="text-muted-foreground mb-3">{shopData.description}</p>
             </div>
           </div>
         </CardContent>
@@ -129,14 +135,14 @@ export default function ShopProfile() {
               {isEditing ? (
                 <Input
                   id="shopName"
-                  value={shopData.shopName}
-                  onChange={(e) => setShopData(prev => ({ ...prev, shopName: e.target.value }))}
+                  value={shopData.name}
+                  onChange={(e) => setShopData(prev => ({ ...prev, name: e.target.value }))}
                   className="mt-1"
                 />
               ) : (
                 <div className="flex items-center gap-2 mt-2 p-2 bg-muted rounded">
                   <Store className="w-4 h-4 text-muted-foreground" />
-                  <span>{shopData.shopName}</span>
+                  <span>{shopData.name}</span>
                 </div>
               )}
             </div>
@@ -177,7 +183,7 @@ export default function ShopProfile() {
           </div>
 
           <div>
-            <Label htmlFor="email">Email Address</Label>
+              <Label htmlFor="email">Email Address</Label>
             {isEditing ? (
               <Input
                 id="email"
@@ -195,7 +201,7 @@ export default function ShopProfile() {
           </div>
 
           <div>
-            <Label htmlFor="address">Shop Address</Label>
+              <Label htmlFor="address">Shop Address</Label>
             {isEditing ? (
               <Textarea
                 id="address"
@@ -211,67 +217,11 @@ export default function ShopProfile() {
             )}
           </div>
 
-          <div>
-            <Label htmlFor="hours">Opening Hours</Label>
-            {isEditing ? (
-              <Input
-                id="hours"
-                value={shopData.openingHours}
-                onChange={(e) => setShopData(prev => ({ ...prev, openingHours: e.target.value }))}
-                className="mt-1"
-                placeholder="e.g., 8:00 AM - 9:00 PM"
-              />
-            ) : (
-              <div className="flex items-center gap-2 mt-2 p-2 bg-muted rounded">
-                <Clock className="w-4 h-4 text-muted-foreground" />
-                <span>{shopData.openingHours}</span>
-              </div>
-            )}
-          </div>
-
-          <div className="flex items-center justify-between p-3 border border-border rounded-lg">
-            <div>
-              <Label htmlFor="isOpen">Shop Status</Label>
-              <p className="text-sm text-muted-foreground">
-                Toggle to open/close your shop for orders
-              </p>
-            </div>
-            <Switch
-              id="isOpen"
-              checked={shopData.isOpen}
-              onCheckedChange={(checked) => setShopData(prev => ({ ...prev, isOpen: checked }))}
-              disabled={!isEditing}
-            />
-          </div>
+          {/* Removed open/close toggle and hours per requirement */}
         </CardContent>
       </Card>
 
-      {/* Business Statistics */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Business Overview</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="text-center p-4 bg-gradient-secondary rounded-lg">
-              <div className="text-2xl font-bold text-primary mb-1">156</div>
-              <div className="text-sm text-muted-foreground">Total Orders</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-secondary rounded-lg">
-              <div className="text-2xl font-bold text-primary mb-1">89</div>
-              <div className="text-sm text-muted-foreground">Customers</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-secondary rounded-lg">
-              <div className="text-2xl font-bold text-primary mb-1">23</div>
-              <div className="text-sm text-muted-foreground">Products</div>
-            </div>
-            <div className="text-center p-4 bg-gradient-secondary rounded-lg">
-              <div className="text-2xl font-bold text-primary mb-1">4.8</div>
-              <div className="text-sm text-muted-foreground">Rating</div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Removed Business Statistics per requirement */}
 
       <Separator className="my-6" />
 
