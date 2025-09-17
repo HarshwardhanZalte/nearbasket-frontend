@@ -54,7 +54,7 @@ export default function Login() {
         // eslint-disable-next-line no-console
         console.log('Dev OTP:', result.otp);
       }
-      toast({ title: 'OTP Sent', description: 'Please enter the 6-digit OTP.' });
+      toast({ title: 'OTP Sent', description: 'Please enter the 4-digit OTP.' });
     } else {
       toast({
         title: "Failed to Send OTP",
@@ -145,6 +145,7 @@ export default function Login() {
             onChange={(e) => setPhone(e.target.value)}
             disabled={showOtp}
               ref={phoneInputRef}
+              autoFocus={!showOtp}
           />
         </div>
 
@@ -157,7 +158,7 @@ export default function Login() {
               placeholder="Enter 4-digit OTP"
               value={otp}
               onChange={(e) => setOtp(e.target.value)}
-              maxLength={6}
+              maxLength={4}
                 autoFocus
                 ref={otpInputRef}
             />
