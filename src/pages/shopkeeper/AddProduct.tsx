@@ -12,6 +12,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { productService } from '@/services/product';
 import { ApiError } from '@/services/api';
+import { uploadImageToFirebase } from '@/lib/uploadImageToFirebase';
 
 const categories = [
   'Fruits',
@@ -42,6 +43,20 @@ export default function AddProduct() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const { user } = useAuth();
 
+  const [imagePreview, setImagePreview] = useState<string | null>(null);
+  
+  const handleImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    // Show preview
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setImagePreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -65,11 +80,29 @@ export default function AddProduct() {
 
     setIsSubmitting(true);
     try {
+      // Upload image if selected
+      const fileInput = document.querySelector<HTMLInputElement>('input[type="file"]');
+      const file = fileInput?.files?.[0];
+      let imageUrl = formData.image;
+      
+      if (file) {
+        try {
+          imageUrl = await uploadImageToFirebase(file, "products");
+        } catch (uploadError) {
+          toast({
+            title: "Image Upload Failed",
+            description: "Failed to upload product image. Please try again.",
+            variant: "destructive",
+          });
+          return;
+        }
+      }
+
       await productService.createProduct(user.shop.id, {
         name: formData.name,
         price: parseFloat(formData.price),
         stock: formData.quantity ? parseInt(formData.quantity as string, 10) : 0,
-        product_image_url: formData.image || undefined,
+        product_image_url: imageUrl || undefined,
         description: formData.description,
       });
       toast({

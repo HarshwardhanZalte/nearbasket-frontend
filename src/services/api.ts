@@ -34,7 +34,8 @@ class ApiService {
 
   private async request<T>(
     endpoint: string,
-    options: RequestInit = {}
+    options: RequestInit = {},
+    skipAuth: boolean = false
   ): Promise<T> {
     const url = `${this.baseURL}${endpoint}`;
     
@@ -43,7 +44,7 @@ class ApiService {
       ...(options.headers as Record<string, string>),
     };
 
-    if (this.token) {
+    if (this.token && !skipAuth) {
       headers.Authorization = `Bearer ${this.token}`;
     }
 
@@ -79,24 +80,24 @@ class ApiService {
   }
 
   // GET request
-  async get<T>(endpoint: string): Promise<T> {
-    return this.request<T>(endpoint, { method: 'GET' });
+  async get<T>(endpoint: string, skipAuth: boolean = false): Promise<T> {
+    return this.request<T>(endpoint, { method: 'GET' }, skipAuth);
   }
 
   // POST request
-  async post<T>(endpoint: string, data?: any): Promise<T> {
+  async post<T>(endpoint: string, data?: any, skipAuth: boolean = false): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'POST',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    }, skipAuth);
   }
 
   // PUT request
-  async put<T>(endpoint: string, data?: any): Promise<T> {
+  async put<T>(endpoint: string, data?: any, skipAuth: boolean = false): Promise<T> {
     return this.request<T>(endpoint, {
       method: 'PUT',
       body: data ? JSON.stringify(data) : undefined,
-    });
+    }, skipAuth);
   }
 
   // DELETE request

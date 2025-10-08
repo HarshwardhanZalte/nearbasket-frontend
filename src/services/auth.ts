@@ -17,12 +17,12 @@ export const authService = {
 
   // Send OTP to mobile number
   async sendOtp(data: SendOtpRequest) {
-    return apiService.post<SendOtpResponse>('/users/send-otp/', data);
+    return apiService.post<SendOtpResponse>('/users/send-otp/', data, true); // skipAuth = true
   },
 
   // Verify OTP and login
   async verifyOtp(data: VerifyOtpRequest) {
-    const response = await apiService.post<LoginResponse>('/users/verify-otp/', data);
+    const response = await apiService.post<LoginResponse>('/users/verify-otp/', data, true); // skipAuth = true since this is part of auth flow
     
     // Store the access token
     if (response.access) {
